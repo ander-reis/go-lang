@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/gorilla/mux"
 )
 
 type Post struct {
@@ -25,6 +26,17 @@ func main() {
 	//_, err = smtp.Exec("My First Post", "My First Content")
 	//checkErr(err)
 
+	db.Close()
+
+	r := mux.NewRouter()
+	r.PathPrefix("/static").Handler(http.StripPrefix("/static", http.FileServer(http.Dir("static/"))))
+
+	r.HandleFunc("/", HomeHandle)
+
+	fmt.Println(http.ListenAndServe(":8080", r))
+}
+
+func ListPosts() []Post {
 	rows, err := db.Query("SELECT * FROM posts")
 	checkErr(err)
 
@@ -37,19 +49,15 @@ func main() {
 		items = append(items, post)
 	}
 
-	db.Close()
+	return items
+}
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+func HomeHandler(w http.ResponseWriter, r *http.Request) {
+	t := template.Must(template.ParseFiles("templates/index.html"))
 
-		t := template.Must(template.ParseFiles("templates/index.html"))
-
-		if err := t.ExecuteTemplate(w, "index.html", items); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-
-	})
-
-	fmt.Println(http.ListenAndServe(":8080", nil))
+	if err := t.ExecuteTemplate(w, "index.html", ListPosts); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func checkErr(err error) {
