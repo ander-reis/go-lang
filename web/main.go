@@ -6,6 +6,8 @@ import (
 	"html/template"
 	"net/http"
 
+	//"database/sql"
+
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 )
@@ -26,12 +28,13 @@ func main() {
 	//_, err = smtp.Exec("My First Post", "My First Content")
 	//checkErr(err)
 
-	db.Close()
+	//db.Close()
 
 	r := mux.NewRouter()
 	r.PathPrefix("/static").Handler(http.StripPrefix("/static", http.FileServer(http.Dir("static/"))))
 
-	r.HandleFunc("/", HomeHandle)
+	r.HandleFunc("/{id}/view", ViewHandler)
+	r.HandleFunc("/", HomeHandler)
 
 	fmt.Println(http.ListenAndServe(":8080", r))
 }
@@ -52,10 +55,27 @@ func ListPosts() []Post {
 	return items
 }
 
-func HomeHandler(w http.ResponseWriter, r *http.Request) {
-	t := template.Must(template.ParseFiles("templates/index.html"))
+func GetPostById(id string) Post {
+	row := db.QueryRow("SELECT * FROM posts WHERE id=?", id)
+	post := Post{}
+	row.Scan(&post.Id, &post.Title, &post.Body)
+	return post
+}
 
-	if err := t.ExecuteTemplate(w, "index.html", ListPosts); err != nil {
+func HomeHandler(w http.ResponseWriter, r *http.Request) {
+	t := template.Must(template.ParseFiles("templates/layout.html", "templates/list.html"))
+
+	if err := t.ExecuteTemplate(w, "layout.html", ListPosts()); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func ViewHandler(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+
+	t := template.Must(template.ParseFiles("templates/layout.html", "templates/view.html"))
+
+	if err := t.ExecuteTemplate(w, "layout.html", GetPostById(id)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
